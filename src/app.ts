@@ -6,6 +6,7 @@ import { errorHandler } from "./middleware/error-handler.js";
 import { notFoundHandler } from "./middleware/not-found.js";
 import { healthRouter } from "./modules/health/health.router.js";
 import { requireJsonContentType } from "./middleware/content-type-guard.js";
+import { v1Router } from "./version-router.js";
 
 export function createApp() {
   const app = express();
@@ -25,6 +26,7 @@ export function createApp() {
 
   // Routes
   app.use("/health", healthRouter);
+  app.use("/v1", v1Router);
 
   // Error handling
   app.use(notFoundHandler);
