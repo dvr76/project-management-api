@@ -83,6 +83,7 @@
         {
           "name": "Refresh Token",
           "request": {
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
             "method": "POST",
             "url": "{{baseUrl}}/auth/refresh"
           }
@@ -90,6 +91,7 @@
         {
           "name": "Logout",
           "request": {
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
             "method": "POST",
             "url": "{{baseUrl}}/auth/logout"
           }
