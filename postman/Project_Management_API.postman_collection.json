@@ -1,6 +1,7 @@
 {
   "info": {
     "name": "Project Management API",
+    "description": "Multi-tenant Project Management REST API. Run requests top-to-bottom: Register → Login → CRUD Projects → Invites. Cookies auto-persist in Postman.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -11,6 +12,14 @@
     {
       "key": "projectId",
       "value": ""
+    },
+    {
+      "key": "inviteId",
+      "value": ""
+    },
+    {
+      "key": "inviteToken",
+      "value": ""
     }
   ],
   "item": [
@@ -19,8 +28,23 @@
       "item": [
         {
           "name": "Health Check",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Status is ok', () => {",
+                  "  const res = pm.response.json();",
+                  "  pm.expect(res.status).to.eql('ok');",
+                  "});"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
             "url": "{{baseUrl}}/health"
           }
         }
@@ -30,13 +54,19 @@
       "name": "Auth",
       "item": [
         {
-          "name": "Register",
+          "name": "Register (New Org)",
           "event": [
             {
               "listen": "test",
               "script": {
                 "exec": [
-                  "pm.test('Status is 201', () => pm.response.to.have.status(201));"
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Has user data', () => {",
+                  "  const res = pm.response.json();",
+                  "  pm.expect(res.data).to.have.property('id');",
+                  "  pm.expect(res.data).to.have.property('email');",
+                  "  pm.expect(res.data).to.have.property('tenantId');",
+                  "});"
                 ]
               }
             }
@@ -46,13 +76,63 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"demo@acme.com\",\n  \"password\": \"supersecure1\",\n  \"name\": \"Demo User\",\n  \"tenantName\": \"Acme Inc\"\n}"
+              "raw": "{\n  \"email\": \"owner@acme.com\",\n  \"password\": \"supersecure1\",\n  \"name\": \"Alice Owner\",\n  \"tenantName\": \"Acme Inc\"\n}"
             },
             "url": "{{baseUrl}}/auth/register"
           }
         },
         {
           "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Has user data', () => {",
+                  "  const res = pm.response.json();",
+                  "  pm.expect(res.data).to.have.property('id');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"owner@acme.com\",\n  \"password\": \"supersecure1\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/login"
+          }
+        },
+        {
+          "name": "Me",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Has JWT payload', () => {",
+                  "  const res = pm.response.json();",
+                  "  pm.expect(res.data).to.have.property('userId');",
+                  "  pm.expect(res.data).to.have.property('tenantId');",
+                  "  pm.expect(res.data).to.have.property('email');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/auth/me"
+          }
+        },
+        {
+          "name": "Refresh Tokens",
           "event": [
             {
               "listen": "test",
@@ -68,32 +148,53 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"demo@acme.com\",\n  \"password\": \"supersecure1\"\n}"
+              "raw": "{}"
             },
-            "url": "{{baseUrl}}/auth/login"
-          }
-        },
-        {
-          "name": "Me",
-          "request": {
-            "method": "GET",
-            "url": "{{baseUrl}}/auth/me"
-          }
-        },
-        {
-          "name": "Refresh Token",
-          "request": {
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "method": "POST",
             "url": "{{baseUrl}}/auth/refresh"
           }
         },
         {
           "name": "Logout",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
           "request": {
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
             "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
             "url": "{{baseUrl}}/auth/logout"
+          }
+        },
+        {
+          "name": "Login (re-login after logout)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"owner@acme.com\",\n  \"password\": \"supersecure1\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/login"
           }
         }
       ]
@@ -108,9 +209,11 @@
               "listen": "test",
               "script": {
                 "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
                   "const res = pm.response.json();",
                   "if (res.data && res.data.id) {",
                   "  pm.collectionVariables.set('projectId', res.data.id);",
+                  "  pm.test('Project ID saved', () => pm.expect(res.data.id).to.be.a('string'));",
                   "}"
                 ]
               }
@@ -127,9 +230,52 @@
           }
         },
         {
+          "name": "Create Project (minimal)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Status defaults to PLANNING', () => {",
+                  "  pm.expect(pm.response.json().data.status).to.eql('PLANNING');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Quick Task\"\n}"
+            },
+            "url": "{{baseUrl}}/projects"
+          }
+        },
+        {
           "name": "List Projects",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Has data array and meta', () => {",
+                  "  const res = pm.response.json();",
+                  "  pm.expect(res.data).to.be.an('array');",
+                  "  pm.expect(res.meta).to.have.property('total');",
+                  "  pm.expect(res.meta).to.have.property('page');",
+                  "  pm.expect(res.meta).to.have.property('totalPages');",
+                  "});"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
             "url": {
               "raw": "{{baseUrl}}/projects?page=1&limit=20",
               "host": ["{{baseUrl}}"],
@@ -142,14 +288,66 @@
           }
         },
         {
-          "name": "Get Project by ID",
+          "name": "List Projects (filter by status)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": {
+              "raw": "{{baseUrl}}/projects?status=PLANNING",
+              "host": ["{{baseUrl}}"],
+              "path": ["projects"],
+              "query": [{ "key": "status", "value": "PLANNING" }]
+            }
+          }
+        },
+        {
+          "name": "Get Project by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Has owner info', () => {",
+                  "  const res = pm.response.json();",
+                  "  pm.expect(res.data).to.have.property('owner');",
+                  "  pm.expect(res.data.owner).to.have.property('name');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
             "url": "{{baseUrl}}/projects/{{projectId}}"
           }
         },
         {
           "name": "Update Project",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Status changed to ACTIVE', () => {",
+                  "  pm.expect(pm.response.json().data.status).to.eql('ACTIVE');",
+                  "});"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "PATCH",
             "header": [{ "key": "Content-Type", "value": "application/json" }],
@@ -162,9 +360,503 @@
         },
         {
           "name": "Delete Project",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
             "url": "{{baseUrl}}/projects/{{projectId}}"
+          }
+        },
+        {
+          "name": "Get Deleted Project (expect 404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/projects/{{projectId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Invites",
+      "item": [
+        {
+          "name": "Create Invite (MEMBER)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "const res = pm.response.json();",
+                  "if (res.data) {",
+                  "  pm.collectionVariables.set('inviteId', res.data.id);",
+                  "  pm.collectionVariables.set('inviteToken', res.data.token);",
+                  "  pm.test('Has token', () => pm.expect(res.data.token).to.be.a('string'));",
+                  "  pm.test('Role is MEMBER', () => pm.expect(res.data.role).to.eql('MEMBER'));",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"bob@example.com\"\n}"
+            },
+            "url": "{{baseUrl}}/invites"
+          }
+        },
+        {
+          "name": "Create Invite (OWNER role)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Role is OWNER', () => {",
+                  "  pm.expect(pm.response.json().data.role).to.eql('OWNER');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"cto@example.com\",\n  \"role\": \"OWNER\"\n}"
+            },
+            "url": "{{baseUrl}}/invites"
+          }
+        },
+        {
+          "name": "Create Invite (duplicate → 409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 409', () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"bob@example.com\"\n}"
+            },
+            "url": "{{baseUrl}}/invites"
+          }
+        },
+        {
+          "name": "List Invites",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Has data array', () => {",
+                  "  pm.expect(pm.response.json().data).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/invites"
+          }
+        },
+        {
+          "name": "Revoke Invite",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": "{{baseUrl}}/invites/{{inviteId}}/revoke"
+          }
+        },
+        {
+          "name": "Revoke Invite (already revoked → 409)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 409', () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": "{{baseUrl}}/invites/{{inviteId}}/revoke"
+          }
+        },
+        {
+          "name": "Register via Invite (revoked → 410)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 410', () => pm.response.to.have.status(410));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"bob@example.com\",\n  \"password\": \"securepass1\",\n  \"name\": \"Bob Member\",\n  \"inviteToken\": \"{{inviteToken}}\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/register"
+          }
+        },
+        {
+          "name": "--- Create fresh invite for accept flow ---",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "const res = pm.response.json();",
+                  "if (res.data) {",
+                  "  pm.collectionVariables.set('inviteId', res.data.id);",
+                  "  pm.collectionVariables.set('inviteToken', res.data.token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"charlie@example.com\"\n}"
+            },
+            "url": "{{baseUrl}}/invites"
+          }
+        },
+        {
+          "name": "Register via Invite (new user)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('User created', () => {",
+                  "  const res = pm.response.json();",
+                  "  pm.expect(res.data.email).to.eql('charlie@example.com');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"charlie@example.com\",\n  \"password\": \"securepass1\",\n  \"name\": \"Charlie New\",\n  \"inviteToken\": \"{{inviteToken}}\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/register"
+          }
+        },
+        {
+          "name": "--- Login back as owner ---",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"owner@acme.com\",\n  \"password\": \"supersecure1\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/login"
+          }
+        },
+        {
+          "name": "Create Invite for existing user (accept flow)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "const res = pm.response.json();",
+                  "if (res.data) {",
+                  "  pm.collectionVariables.set('inviteId', res.data.id);",
+                  "  pm.collectionVariables.set('inviteToken', res.data.token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"charlie@example.com\"\n}"
+            },
+            "url": "{{baseUrl}}/invites"
+          }
+        },
+        {
+          "name": "--- Login as Charlie ---",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"charlie@example.com\",\n  \"password\": \"securepass1\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/login"
+          }
+        },
+        {
+          "name": "Accept Invite (existing user)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Has tenantId and role', () => {",
+                  "  const res = pm.response.json();",
+                  "  pm.expect(res.data).to.have.property('tenantId');",
+                  "  pm.expect(res.data).to.have.property('role');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{inviteToken}}\"\n}"
+            },
+            "url": "{{baseUrl}}/invites/accept"
+          }
+        },
+        {
+          "name": "Accept Invite (already used → 410)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 410', () => pm.response.to.have.status(410));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{inviteToken}}\"\n}"
+            },
+            "url": "{{baseUrl}}/invites/accept"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Validation & Errors",
+      "item": [
+        {
+          "name": "Register (invalid email → 400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Has validation errors', () => {",
+                  "  pm.expect(pm.response.json().errors).to.be.an('object');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"not-an-email\",\n  \"password\": \"short\",\n  \"name\": \"\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/register"
+          }
+        },
+        {
+          "name": "Login (wrong password → 401)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"owner@acme.com\",\n  \"password\": \"wrongpassword\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/login"
+          }
+        },
+        {
+          "name": "Create Project (no title → 400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Has errors object', () => {",
+                  "  pm.expect(pm.response.json().errors).to.be.an('object');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"No title here\"\n}"
+            },
+            "url": "{{baseUrl}}/projects"
+          }
+        },
+        {
+          "name": "Get Project (bad UUID → 400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/projects/not-a-valid-uuid"
+          }
+        },
+        {
+          "name": "Non-existent route (→ 404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 404', () => pm.response.to.have.status(404));",
+                  "pm.test('RFC 9457 shape', () => {",
+                  "  const res = pm.response.json();",
+                  "  pm.expect(res).to.have.property('type');",
+                  "  pm.expect(res).to.have.property('title');",
+                  "  pm.expect(res).to.have.property('status');",
+                  "  pm.expect(res).to.have.property('detail');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{baseUrl}}/nonexistent"
           }
         }
       ]
