@@ -24,8 +24,11 @@ export function validate(schemas: ValidateSchemas): RequestHandler {
           errors[`${source}.${field}`] = messages;
         }
       } else {
-        // Replace with parsed coerced values
-        (req as any)[key] = result.data;
+        if (key === "query" || key === "params") {
+          Object.assign((req as any)[key], result.data);
+        } else {
+          (req as any)[key] = result.data;
+        }
       }
     }
 
