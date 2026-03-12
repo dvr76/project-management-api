@@ -29,8 +29,8 @@ export async function listProjects(
   query: ListProjectsQuery,
   actor: ActorContext,
 ) {
-  const page = query.page ?? 1;
-  const limit = query.limit ?? 20;
+  const page = Number(query.page) || 1;
+  const limit = Number(query.limit) || 20;
 
   const where = {
     tenantId: actor.tenantId,
