@@ -4,7 +4,6 @@ import { pinoHttp } from "pino-http";
 import { logger } from "./config/logger.js";
 import { errorHandler } from "./middleware/error-handler.js";
 import { notFoundHandler } from "./middleware/not-found.js";
-import { healthRouter } from "./modules/health/health.router.js";
 import { requireJsonContentType } from "./middleware/content-type-guard.js";
 import { v1Router } from "./version-router.js";
 
@@ -25,7 +24,6 @@ export function createApp() {
   app.use(requireJsonContentType);
 
   // Routes
-  app.use("/health", healthRouter);
   app.use("/v1", v1Router);
 
   // Error handling
