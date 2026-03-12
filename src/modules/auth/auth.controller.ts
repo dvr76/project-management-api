@@ -8,25 +8,47 @@ import {
 } from "../../lib/jwt.js";
 import { problemTypes } from "../../lib/problem-details.js";
 
+const INVITE_ERRORS: Record<string, { status: number; detail: string }> = {
+  INVITE_NOT_FOUND: { status: 404, detail: "Invite token not found" },
+  INVITE_REVOKED: { status: 410, detail: "This invite has been revoked" },
+  INVITE_ALREADY_USED: {
+    status: 410,
+    detail: "This invite has already been used",
+  },
+  INVITE_EXPIRED: { status: 410, detail: "This invite has expired" },
+  INVITE_EMAIL_MISMATCH: {
+    status: 403,
+    detail: "This invite was sent to a different email",
+  },
+};
+
 export const register: RequestHandler = async (req, res, next) => {
   try {
     const result = await authService.registerUser(req.body);
 
     if ("error" in result) {
-      res.status(409).json({
-        type: problemTypes("email-taken"),
-        title: "Conflict",
-        status: 409,
-        detail: "A user with this email already exists",
+      if (result.error === "EMAIL_TAKEN") {
+        res.status(409).json({
+          type: problemTypes("email-taken"),
+          title: "Conflict",
+          status: 409,
+          detail: "A user with this email already exists",
+        });
+        return;
+      }
+
+      const mapped = INVITE_ERRORS[result.error];
+      res.status(mapped.status).json({
+        type: problemTypes("invite-error"),
+        title: "Invite Error",
+        status: mapped.status,
+        detail: mapped.detail,
       });
       return;
     }
 
     setAuthCookies(res, result.tokens.accessToken, result.tokens.refreshToken);
-
-    res.status(201).json({
-      data: result.user,
-    });
+    res.status(201).json({ data: result.user });
   } catch (err) {
     next(err);
   }
@@ -46,11 +68,9 @@ export const login: RequestHandler = async (req, res, next) => {
       return;
     }
 
+    // TS narrows to { user; tokens } cleanly
     setAuthCookies(res, result.tokens.accessToken, result.tokens.refreshToken);
-
-    res.json({
-      data: result.user,
-    });
+    res.json({ data: result.user });
   } catch (err) {
     next(err);
   }
@@ -81,7 +101,6 @@ export const refresh: RequestHandler = (req, res) => {
       tenantId: payload.tenantId,
       email: payload.email,
     });
-
     const newRefresh = signRefreshToken({
       userId: payload.userId,
       tenantId: payload.tenantId,
@@ -89,8 +108,7 @@ export const refresh: RequestHandler = (req, res) => {
     });
 
     setAuthCookies(res, newAccess, newRefresh);
-
-    res.json({ data: { message: "Tokens Refreshed" } });
+    res.json({ data: { message: "Tokens refreshed" } });
   } catch {
     clearAuthCookies(res);
     res.status(401).json({
