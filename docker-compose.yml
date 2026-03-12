@@ -12,5 +12,19 @@ services:
     volumes:
       - pg_data:/var/lib/postgresql/data
 
+  api:
+    build: .
+    container_name: pm_api
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+
 volumes:
   pg_data:
